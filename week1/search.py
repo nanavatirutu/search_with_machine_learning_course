@@ -74,8 +74,12 @@ def query():
         query_obj = create_query("*", [], sort, sortDir)
 
     print("query obj: {}".format(query_obj))
-    response = None   # TODO: Replace me with an appropriate call to OpenSearch
-    # Postprocess results here if you so desire
+
+    index_name = "bbuy_products"
+    response = opensearch.search(
+            body=query_obj,
+            index=index_name
+        )
 
     #print(response)
     if error is None:
@@ -91,7 +95,10 @@ def create_query(user_query, filters, sort="_score", sortDir="desc"):
     query_obj = {
         'size': 10,
         "query": {
-            "match_all": {} # Replace me with a query that both searches and filters
+            "multi_match": {
+                body:
+                index:
+            } # Replace me with a query that both searches and filters
         },
         "aggs": {
             #TODO: FILL ME IN
