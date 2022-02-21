@@ -29,9 +29,24 @@ def process_filters(filters_input):
         #TODO: IMPLEMENT AND SET filters, display_filters and applied_filters.
         # filters get used in create_query below.  display_filters gets used by display_filters.jinja2 and applied_filters gets used by aggregations.jinja2 (and any other links that would execute a search.)
         if type == "range":
-            pass
-        elif type == "terms":
-            pass #TODO: IMPLEMENT
+            from_val = request.args.get(filter + ".from")
+            to_val = request.args.get(filter + ".to")
+            range = {}
+            if from_val:
+                range["gte"] = from_val
+            if to_val:
+                range["lt"] = to_val
+            filters.append({"range": {filter: range}})
+            display_filters.append(f"{display_name}: {from_val} to {to_val}")
+            applied_filters += f"&{filter}.from={from_val}&{filter}.to={to_val}"
+
+        elif type == "terms": 
+            field_name = request.args.get(filter + ".name")
+            field_val  = request.args.get(filter + ".key")
+            filters.append({"term": {filter: field_val}})
+            display_filters.append(f"{field_name}: {field_val}")
+            applied_filters += f"&{filter}.name={field_name}&{filter}.key={field_val}"
+
     print("Filters: {}".format(filters))
 
     return filters, display_filters, applied_filters
@@ -92,16 +107,181 @@ def query():
 
 def create_query(user_query, filters, sort="_score", sortDir="desc"):
     print("Query: {} Filters: {} Sort: {}".format(user_query, filters, sort))
+    
     query_obj = {
-        'size': 10,
-        "query": {
-            "multi_match": {
-                body:
-                index:
-            } # Replace me with a query that both searches and filters
-        },
-        "aggs": {
-            #TODO: FILL ME IN
+                    "size": 10,
+                    "sort":
+                    [
+                        {sort: {"order": sortDir}}
+                    ],
+                    "query":
+                    {
+                        "function_score":
+                        {
+                            "query": 
+                            {
+                                "bool": 
+                                {
+                                    "must": 
+                                    [
+                                        
+                                        {
+                                            "multi_match": 
+                                            { 
+                                                "query": user_query, 
+                                                "fields": ['name^10', 'shorDescription^4', 'longDescription^2','department']  
+                                            } 
+                                        }
+                                    ],
+                                    "should":
+                                    [
+                                        {
+                                            "term": 
+                                            {
+                                                "name": 
+                                                {
+                                                    "value": user_query,
+                                                    "boost": 10.0
+                                                }
+                                            }
+                                        }
+
+                                    ],
+                                    "filter": filters,
+                                }
+                            },
+                            "boost_mode": "multiply",
+                            "score_mode": "avg",
+                            "functions": 
+                            [
+                                {
+                                    "field_value_factor": {
+                                        "field": "salesRankShortTerm",
+                                        "modifier": "reciprocal",
+                                        "missing": 100000000
+                                    }
+                                },
+                                {
+                                    "field_value_factor": {
+                                        "field": "salesRankMediumTerm",
+                                        "modifier": "reciprocal",
+                                        "missing": 100000000
+                                    }
+                                },
+                                {
+                                    "field_value_factor": {
+                                        "field": "salesRankLongTerm",
+                                        "modifier": "reciprocal",
+                                        "missing": 100000000
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                
+                    "aggs": 
+                    {
+                        "regularPrice": 
+                        {
+                            "range": 
+                            {
+                                "field": "salePrice",
+                                "ranges": 
+                                [
+                                    {"to": 100},
+                                    {"from": 100, "to": 500},
+                                    {"from": 500},
+                                ]
+                            },
+                            "aggs": 
+                            {
+                                "price_stats": 
+                                {
+                                    "stats": {"field": "regularPrice"}
+                                }
+                            }
+                        },
+                        "department":
+                        {
+                            "terms":
+                            {
+                                "field": "department.keyword",
+                                "min_doc_count":0
+                            } 
+
+                        },
+                        "missing_images": 
+                        {
+                            "missing": 
+                            {
+                                "field": "image"
+                            }
+                        }
+                    }                    
+
+                            
+                }
+    
+    if user_query == "*":
+        query_obj = {
+            "query":
+                    {
+                        "function_score":
+                        {
+                            "query": 
+                            {
+                                "bool": 
+                                {
+                                    "must": 
+                                    [
+                                        
+                                        {
+                                            "match_all": {}
+                                        }
+                                    ],
+                                    "filter": filters,
+                                }
+                            }
+                        }
+                    },
+                    "aggs": 
+                    {
+                        "regularPrice": 
+                        {
+                            "range": 
+                            {
+                                "field": "salePrice",
+                                "ranges": 
+                                [
+                                    {"to": 100},
+                                    {"from": 100, "to": 500},
+                                    {"from": 500},
+                                ]
+                            },
+                            "aggs": 
+                            {
+                                "price_stats": 
+                                {
+                                    "stats": {"field": "regularPrice"}
+                                }
+                            }
+                        },
+                        "department":
+                        {
+                            "terms":
+                            {
+                                "field": "department.keyword",
+                                "min_doc_count":0
+                            } 
+
+                        },
+                        "missing_images": 
+                        {
+                            "missing": 
+                            {
+                                "field": "image"
+                            }
+                        }
+                    }
         }
-    }
     return query_obj
