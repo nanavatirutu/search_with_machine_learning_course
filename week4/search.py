@@ -56,9 +56,19 @@ def process_filters(filters_input):
 
     return filters, display_filters, applied_filters
 
+def normalize_query(query):
+    query_clean = "".join([i for i in query.lower() if i not in string.punctuation])
+    query_clean_tokens = word_tokenize(query_clean)
+    sb = stemmer("english")
+    query_clean_tokens = [sb.stem(token) for token in query_clean_tokens]
+    return (" ").join(query_clean_tokens)
+
 def get_query_category(user_query, query_class_model):
-    print("IMPLEMENT ME: get_query_category")
-    return None
+    categories = []
+    user_query = normalize_query(user_query)
+    predicted_cats, confidence = query_class_model.predict(user_query, 5)
+    categories += [ category.replace('__label__', '') for category, confidence in zip(predicted_cats, confidence) if confidence > 0.5]
+    return categories
 
 
 @bp.route('/query', methods=['GET', 'POST'])
@@ -138,7 +148,7 @@ def query():
     query_class_model = current_app.config["query_model"]
     query_category = get_query_category(user_query, query_class_model)
     if query_category is not None:
-        print("IMPLEMENT ME: add this into the filters object so that it gets applied at search time.  This should look like your `term` filter from week 1 for department but for categories instead")
+        qu.add_filter(query_obj, query_category)
     #print("query obj: {}".format(query_obj))
     response = opensearch.search(body=query_obj, index=current_app.config["index_name"], explain=explain)
     # Postprocess results here if you so desire

@@ -314,3 +314,11 @@ def add_aggs(query_obj):
         }
 
     }
+def add_filter(query_obj, query_categories):
+    if "match_all" not in query_obj["query"]:
+        query_obj["query"]["bool"]["filter"] = [{
+            "terms": {
+                "categoryPathIds.keyword": query_categories
+            }
+        }]
+    return query_obj
